@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>*{box-sizing:border-box}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Pequeños pasos, grandes sueños</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: lienzo 3D a pantalla completa, sala actual arriba a la izquierda, menú de salas arriba a la derecha, ficha de obra abajo */
+:root {
+  --night: #17130f;
+  --ink: #f4ede2;
+  --ink-soft: #c9bfb0;
+  --glass: rgba(28, 23, 18, 0.76);
+  --line: rgba(244, 237, 226, 0.16);
+  --leaf: #8cc152;
+  --display: "Gloock", "Georgia", serif;
+  --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--night);
+  color: var(--ink);
+  font-family: var(--body);
+  overflow: hidden;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+#stage { position: fixed; inset: 0; touch-action: none; }
+#stage canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+#stage canvas.dragging { cursor: grabbing; }
+#stage canvas.hot { cursor: zoom-in; }
+#stage canvas.focused { cursor: zoom-out; }
+
+.panel {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.eyebrow {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--leaf);
+}
+
+.chip {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  max-width: min(360px, calc(100% - 150px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  pointer-events: none;
+}
+.chip strong { font-family: var(--display); font-weight: 400; font-size: 19px; line-height: 1.15; text-wrap: balance; }
+.chip .load { font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+.menu-btn {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  font: 600 14px var(--body);
+  color: var(--ink);
+  padding: 11px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.menu-btn:focus-visible, .rooms button:focus-visible, .sheet button:focus-visible { outline: 2px solid var(--leaf); outline-offset: 2px; }
+.rooms {
+  position: fixed;
+  top: calc(62px + env(safe-area-inset-top, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  width: min(320px, calc(100% - 32px));
+  max-height: calc(100% - 140px);
+  overflow-y: auto;
+  border-radius: 12px;
+  padding: 8px;
+  display: grid; gap: 2px;
+}
+.rooms[hidden] { display: none; }
+.rooms button {
+  display: grid; gap: 2px; text-align: left;
+  font: 500 15px/1.3 var(--body);
+  color: var(--ink);
+  background: transparent;
+  border: 0; border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.rooms button:hover { background: rgba(244, 237, 226, 0.08); }
+.rooms button[aria-current="true"] { background: rgba(140, 193, 82, 0.16); }
+
+.hint {
+  position: fixed;
+  left: 50%; transform: translateX(-50%);
+  top: calc(96px + env(safe-area-inset-top, 0px));
+  width: min(440px, calc(100% - 32px));
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px; line-height: 1.45; color: var(--ink-soft);
+  text-align: center;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+.hint.gone { opacity: 0; }
+
+.joy {
+  position: fixed;
+  left: max(20px, calc(env(safe-area-inset-left, 0px) + 12px));
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 112px; height: 112px;
+  border-radius: 50%;
+  touch-action: none;
+  transition: opacity 0.3s ease;
+}
+.joy::after {
+  content: "Caminar";
+  position: absolute; left: 50%; top: -22px; transform: translateX(-50%);
+  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft);
+  white-space: nowrap;
+}
+.knob {
+  position: absolute; left: 50%; top: 50%;
+  width: 46px; height: 46px; margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  background: var(--leaf);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+}
+.keys {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  font-size: 12px; color: var(--ink-soft);
+  padding: 8px 12px; border-radius: 8px;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.keys kbd {
+  font-family: var(--body); font-size: 11px;
+  border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; margin: 0 1px;
+}
+@media (pointer: coarse) { .keys { display: none; } }
+
+.sheet {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 20px);
+  width: min(560px, calc(100% - 32px));
+  max-height: calc(60% - 20px);
+  overflow-y: auto;
+  padding: 16px 18px;
+  display: grid; gap: 8px;
+  border-radius: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.sheet.open { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.sheet h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 23px; line-height: 1.15; text-wrap: balance; }
+.sheet p { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--ink-soft); max-width: 62ch; white-space: pre-line; }
+.sheet .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.sheet button {
+  font: 600 14px var(--body);
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  color: var(--ink);
+  background: rgba(244, 237, 226, 0.08);
+  border: 1px solid var(--line);
+}
+.sheet button.primary { color: var(--night); background: var(--leaf); border-color: transparent; }
+.sheet button:disabled { opacity: 0.35; cursor: default; }
+.sheet .back { margin-left: auto; }
+
+.ui-hidden { opacity: 0; pointer-events: none; }
+.fail {
+  position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center;
+  font-size: 15px; color: var(--ink-soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet, .hint, .joy, .keys { transition: none; }
+}
+</style>
+
+</head>
+<body>
+<div id="stage" aria-label="Galería en 3D Pequeños pasos, grandes sueños"></div>
+
+<div class="chip panel" aria-live="polite">
+  <span class="eyebrow" id="room-eyebrow">Entrada</span>
+  <strong id="room-title">Pequeños pasos, grandes sueños</strong>
+  <span class="load" id="load">Cargando fotos…</span>
+</div>
+
+<button class="menu-btn panel" id="menu-btn" type="button" aria-expanded="false" aria-controls="rooms">Salas</button>
+<nav class="rooms panel" id="rooms" hidden aria-label="Ir a una sala"></nav>
+
+<div class="hint panel" id="hint">Arrastra para mirar alrededor. Usa el control o las teclas para caminar. Toca una foto o un texto para acercarte.</div>
+
+<div class="joy panel" id="joy" aria-label="Control para caminar"><div class="knob" id="knob"></div></div>
+<div class="keys panel" id="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> o flechas para caminar</div>
+
+<div class="sheet panel" id="sheet" role="dialog" aria-labelledby="sheet-title">
+  <span class="eyebrow" id="sheet-eyebrow"></span>
+  <h2 id="sheet-title"></h2>
+  <p id="sheet-text"></p>
+  <div class="row">
+    <button id="prev" type="button">Anterior</button>
+    <button id="next" type="button" class="primary">Siguiente</button>
+    <button id="back" type="button" class="back">Volver al recorrido</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  /* ---------- Contenido tomado del documento ---------- */
+  var ROOMS = [
+    {
+      eyebrow: 'Galería', title: 'Pequeños pasos, grandes sueños', short: 'Entrada',
+      wall: 0xefeae1, accent: '#5e9b2e'
+    },
+    {
+      eyebrow: 'Visita 1', title: 'Diagnóstico',
+      text: 'Esto representa la primera visita, donde observamos el lugar e identificamos las problemáticas y acciones a realizar en este espacio. Notamos que la fundación Niños de Paz se enfoca en incentivar la educación en jóvenes, en especial a nivel humano y espiritual.',
+      photos: [{ src: 'img/02.jpg', a: 1026 / 770 }, { src: 'img/03.jpg', a: 989 / 742 }],
+      wall: 0xe2ebe4, accent: '#3d7a55'
+    },
+    {
+      eyebrow: 'Visita 2', title: 'Sadrac',
+      text: 'En compañía de un colegio, lideramos una actividad donde, tomando como guía la historia de Sadrac, Mesac y Abed-nego, fortalecimos su fe al mostrar con esta parábola cómo la fe y la esperanza en Dios hacen maravillas.',
+      photos: [{ src: 'img/04.jpg', a: 1117 / 841 }, { src: 'img/05.jpg', a: 4 / 3 }, { src: 'img/06.jpg', a: 1375 / 1035 }],
+      wall: 0xe0eaee, accent: '#1f7085'
+    },
+    {
+      eyebrow: 'Visita 3', title: 'En camino con Jesús',
+      text: 'En nuestra segunda visita buscamos fortalecer nuestra relación con los jóvenes mediante actividades espirituales, usando parábolas como guía, la de la oveja perdida, el buen samaritano y el hijo pródigo. Esto para unir la recreación con enseñanzas valiosas para los jóvenes.',
+      photos: [{ src: 'img/07.jpg', a: 1 }, { src: 'img/08.jpg', a: 1 }, { src: 'img/09.jpg', a: 951 / 716 }],
+      wall: 0xefe6d4, accent: '#a86a22'
+    },
+    {
+      eyebrow: 'Visita 4', title: 'Grandes sonrisas, corazones llenos',
+      text: 'Junto a Isaías hicimos la toma de las fotos de los jóvenes de la población para que pudieran ser apadrinados por adultos que apoyan la fundación. De este modo, además de aprender semana a semana, también sentían el aprecio de alguien por todo lo que aprendían y su esfuerzo.',
+      photos: [{ src: 'img/10.jpg', a: 710 / 891 }, { src: 'img/11.jpg', a: 710 / 891 }, { src: 'img/12.jpg', a: 4 / 3 }],
+      wall: 0xf0e1db, accent: '#b04f44'
+    },
+    {
+      eyebrow: 'Visita 5', title: 'De carta en carta, nadie se aparta',
+      text: 'Con todos los jóvenes escribimos cartas para cada uno de los padrinos que apadrinaría a un joven. No eran solo palabras en papel, eran la materialización de los sueños, la alegría y el carisma de cada niño.',
+      photos: [{ src: 'img/13.jpg', a: 1400 / 1054 }, { src: 'img/14.jpg', a: 1053 / 1400 }],
+      wall: 0xe4e5f0, accent: '#555a9a'
+    }
+  ];
+  var FOUNDATION = {
+    eyebrow: 'Entrada', title: 'Fundación Niños de Paz',
+    text: 'Esta es una fundación fundada por Isaías y su esposa que se enfoca en enseñar valores a los jóvenes, desde los 0 a los 14 años. Nos sentimos impulsados a ir a esta fundación por cómo se alineaban los valores promovidos a los jóvenes con nuestro fundamento cristiano y humano. Además, la inspiración y alegría que nos daba compartir con jóvenes fue otro motivo clave para acompañar a esta fundación en este semestre.'
+  };
+  var ROUTE = {
+    eyebrow: 'Recorrido', title: 'Cinco visitas',
+    text: ROOMS.slice(1).map(function (r) { return r.eyebrow + '. ' + r.title; }).join('\n')
+  };
+
+  if (!window.THREE) { showFail(); return; }
+  var THREE = window.THREE;
+  var stage = document.getElementById('stage');
+  var renderer;
+  try { renderer = new THREE.WebGLRenderer({ antialias: true }); } catch (e) { showFail(); return; }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  stage.appendChild(renderer.domElement);
+  var canvasEl = renderer.domElement;
+  var maxAniso = renderer.capabilities.getMaxAnisotropy();
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x17130f);
+  var camera = new THREE.PerspectiveCamera(62, 1, 0.05, 90);
+  camera.rotation.order = 'YXZ';
+
+  /* ---------- Medidas en metros ---------- */
+  var N = ROOMS.length;
+  var W = 10, D = 9, H = 4.2, DOOR = 2.4, DOORH = 3.0, EYE = 1.6, WALL_T = 0.1;
+  var SEG = (W - DOOR) / 2;
+  function cz(i) { return -i * D; }
+  function boundaryZ(i) { return cz(i) - D / 2; } // entre la sala i y la i+1
+  function roomOf(z) { return Math.max(0, Math.min(N - 1, Math.round(-z / D))); }
+
+  /* ---------- Texturas dibujadas ---------- */
+  function woodTexture() {
+    var c = document.createElement('canvas'); c.width = 512; c.height = 512;
+    var g = c.getContext('2d');
+    var plankH = 64, seed = 7;
+    function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+    for (var y = 0; y < 512; y += plankH) {
+      var s = 92 + Math.floor(rnd() * 26);
+      g.fillStyle = 'rgb(' + (s + 22) + ',' + Math.floor(s * 0.72) + ',' + Math.floor(s * 0.47) + ')';
+      g.fillRect(0, y, 512, plankH);
+      for (var k = 0; k < 16; k++) {
+        g.strokeStyle = 'rgba(40,24,12,' + (0.05 + rnd() * 0.12) + ')';
+        g.lineWidth = 1 + rnd() * 1.5;
+        g.beginPath();
+        var yy = y + rnd() * plankH;
+        g.moveTo(0, yy);
+        for (var x = 0; x <= 512; x += 32) g.lineTo(x, yy + Math.sin(x * 0.02 + k) * 2);
+        g.stroke();
+      }
+      g.fillStyle = 'rgba(25,15,8,0.55)'; g.fillRect(0, y, 512, 2);
+      g.fillRect(rnd() * 512, y, 2, plankH);
+    }
+    var t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(3, (N * D) / 3.4);
+    t.encoding = THREE.sRGBEncoding;
+    t.anisotropy = maxAniso;
+    return t;
+  }
+  var glowTex = (function () {
+    var c = document.createElement('canvas'); c.width = c.height = 256;
+    var g = c.getContext('2d');
+    var grd = g.createRadialGradient(128, 110, 4, 128, 128, 128);
+    grd.addColorStop(0, 'rgba(255,240,214,0.55)');
+    grd.addColorStop(0.55, 'rgba(255,240,214,0.18)');
+    grd.addColorStop(1, 'rgba(255,240,214,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, 256, 256);
+    var t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+  })();
+
+  function wrapLines(g, text, maxW) {
+    var out = [];
+    String(text).split('\n').forEach(function (para) {
+      var words = para.split(' '), line = '';
+      words.forEach(function (w) {
+        var test = line ? line + ' ' + w : w;
+        if (g.measureText(test).width > maxW && line) { out.push(line); line = w; }
+        else line = test;
+      });
+      out.push(line);
+    });
+    return out;
+  }
+
+  var redraws = [];
+  // Texto de sala pintado directamente sobre la pared
+  function wallText(opts) {
+    var cw = 1200, pad = 10;
+    var c = document.createElement('canvas'); c.width = cw;
+    var g = c.getContext('2d');
+    function layout() {
+      g.font = '400 78px Gloock, Georgia, serif';
+      var tl = wrapLines(g, opts.title, cw - pad * 2);
+      g.font = '400 37px Figtree, system-ui, sans-serif';
+      var bl = wrapLines(g, opts.text, cw - pad * 2);
+      return { tl: tl, bl: bl, h: 70 + tl.length * 88 + 34 + bl.length * 56 + 20 };
+    }
+    var L = layout();
+    c.height = Math.ceil(L.h);
+    var tex = new THREE.CanvasTexture(c);
+    tex.encoding = THREE.sRGBEncoding; tex.anisotropy = maxAniso;
+    function draw() {
+      var L2 = layout();
+      g.clearRect(0, 0, c.width, c.height);
+      g.textBaseline = 'alphabetic';
+      g.fillStyle = opts.accent;
+      g.font = '600 32px Figtree, system-ui, sans-serif';
+      g.fillText(opts.eyebrow.toUpperCase().split('').join(String.fromCharCode(8202)), pad, 44);
+      g.fillStyle = '#231d18';
+      g.font = '400 78px Gloock, Georgia, serif';
+      var y = 70;
+      L2.tl.forEach(function (ln) { y += 88; g.fillText(ln, pad, y - 14); });
+      g.fillStyle = opts.accent; g.fillRect(pad, y + 6, 90, 5);
+      y += 34;
+      g.fillStyle = '#3b332c';
+      g.font = '400 37px Figtree, system-ui, sans-serif';
+      L2.bl.forEach(function (ln) { y += 56; g.fillText(ln, pad, y - 12); });
+      tex.needsUpdate = true;
+    }
+    draw(); redraws.push(draw);
+    var wM = opts.width, hM = wM * c.height / cw;
+    if (hM > opts.maxH) { wM *= opts.maxH / hM; hM = opts.maxH; }
+    return { tex: tex, w: wM, h: hM };
+  }
+  // Rótulo grande sobre la puerta
+  function bandText(eyebrow, title, accent) {
+    var c = document.createElement('canvas'); c.width = 2400; c.height = 260;
+    var g = c.getContext('2d');
+    var tex = new THREE.CanvasTexture(c);
+    tex.encoding = THREE.sRGBEncoding; tex.anisotropy = maxAniso;
+    function draw() {
+      g.clearRect(0, 0, c.width, c.height);
+      g.textAlign = 'center';
+      g.fillStyle = accent;
+      g.font = '600 36px Figtree, system-ui, sans-serif';
+      g.fillText(eyebrow.toUpperCase().split('').join(String.fromCharCode(8202)), 1200, 58);
+      var size = 128;
+      g.font = '400 ' + size + 'px Gloock, Georgia, serif';
+      while (g.measureText(title).width > 2280 && size > 60) { size -= 4; g.font = '400 ' + size + 'px Gloock, Georgia, serif'; }
+      g.fillStyle = '#231d18';
+      g.fillText(title, 1200, 210);
+      tex.needsUpdate = true;
+    }
+    draw(); redraws.push(draw);
+    return tex;
+  }
+
+  /* ---------- Construcción ---------- */
+  var loadEl = document.getElementById('load');
+  var manager = new THREE.LoadingManager();
+  var totalPhotos = 0, loadedPhotos = 0;
+  var loader = new THREE.TextureLoader(manager);
+  function updateLoad() {
+    if (loadedPhotos >= totalPhotos) { loadEl.hidden = true; return; }
+    loadEl.textContent = 'Cargando fotos ' + loadedPhotos + ' de ' + totalPhotos;
+  }
+
+  var items = [];
+  var clickable = [];
+  var frameMat = new THREE.MeshStandardMaterial({ color: 0x241a13, roughness: 0.45, metalness: 0.1 });
+  var woodDark = new THREE.MeshStandardMaterial({ color: 0x2b211a, roughness: 0.8 });
+
+  function wallFrame(roomIdx, wall, off, y) {
+    var r = cz(roomIdx), p, n;
+    if (wall === 'back') { p = new THREE.Vector3(off, y, r - D / 2 + WALL_T); n = new THREE.Vector3(0, 0, 1); }
+    else if (wall === 'left') { p = new THREE.Vector3(-W / 2, y, r + off); n = new THREE.Vector3(1, 0, 0); }
+    else { p = new THREE.Vector3(W / 2, y, r + off); n = new THREE.Vector3(-1, 0, 0); }
+    return { p: p, n: n, ry: Math.atan2(n.x, n.z) };
+  }
+
+  function addPhoto(roomIdx, src, aspect, wall, off, maxW, maxH, y, meta) {
+    var f = wallFrame(roomIdx, wall, off, y);
+    var w = Math.min(maxW, maxH * aspect), h = w / aspect;
+    var g = new THREE.Group();
+    g.position.copy(f.p); g.rotation.y = f.ry;
+    var glow = new THREE.Mesh(new THREE.PlaneGeometry(w + 1.6, h + 1.8), new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, depthWrite: false }));
+    glow.position.set(0, 0.25, 0.004);
+    var frame = new THREE.Mesh(new THREE.BoxGeometry(w + 0.12, h + 0.12, 0.06), frameMat);
+    frame.position.z = 0.03;
+    var photoMat = new THREE.MeshBasicMaterial({ color: 0xcfc8bc });
+    var photo = new THREE.Mesh(new THREE.PlaneGeometry(w, h), photoMat);
+    photo.position.z = 0.062;
+    g.add(glow, frame, photo);
+    scene.add(g);
+    totalPhotos++;
+    loader.load(src, function (tex) {
+      tex.encoding = THREE.sRGBEncoding; tex.anisotropy = maxAniso;
+      photoMat.map = tex; photoMat.color.set(0xffffff); photoMat.needsUpdate = true;
+      loadedPhotos++; updateLoad();
+    }, undefined, function () { loadedPhotos++; updateLoad(); });
+    // Lámpara en el techo apuntando a la obra
+    var lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.2, 16), woodDark);
+    lamp.position.copy(f.p).addScaledVector(f.n, 1.1); lamp.position.y = H - 0.14;
+    scene.add(lamp);
+    var item = Object.assign({ kind: 'photo', room: roomIdx, center: new THREE.Vector3(f.p.x, y, f.p.z).addScaledVector(f.n, 0.06), n: f.n, w: w + 0.12, h: h + 0.12 }, meta);
+    item.index = items.length; items.push(item);
+    photo.userData.item = item.index; frame.userData.item = item.index;
+    clickable.push(photo, frame);
+  }
+
+  function addText(roomIdx, wall, off, y, opts, meta) {
+    var f = wallFrame(roomIdx, wall, off, y);
+    var t = wallText(opts);
+    var m = new THREE.Mesh(new THREE.PlaneGeometry(t.w, t.h), new THREE.MeshBasicMaterial({ map: t.tex, transparent: true, depthWrite: false }));
+    m.position.copy(f.p).addScaledVector(f.n, 0.008);
+    m.rotation.y = f.ry;
+    scene.add(m);
+    var item = Object.assign({ kind: 'text', room: roomIdx, center: m.position.clone(), n: f.n, w: t.w, h: t.h }, meta);
+    item.index = items.length; items.push(item);
+    m.userData.item = item.index;
+    clickable.push(m);
+  }
+
+  // Piso y techo continuos
+  var totalLen = N * D;
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(W, totalLen), new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.72 }));
+  floor.rotation.x = -Math.PI / 2; floor.position.z = D / 2 - totalLen / 2;
+  scene.add(floor);
+  var ceil = new THREE.Mesh(new THREE.PlaneGeometry(W, totalLen), new THREE.MeshLambertMaterial({ color: 0xdcd6ca }));
+  ceil.rotation.x = Math.PI / 2; ceil.position.set(0, H, D / 2 - totalLen / 2);
+  scene.add(ceil);
+
+  function plane(w, h, mat, x, y, z, ry) {
+    var m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    m.position.set(x, y, z); m.rotation.y = ry; scene.add(m); return m;
+  }
+  function solidWall(z, ry, mat) { plane(W, H, mat, 0, H / 2, z, ry); }
+  function doorWall(z, ry, mat) {
+    plane(SEG, H, mat, -(DOOR / 2 + SEG / 2), H / 2, z, ry);
+    plane(SEG, H, mat, (DOOR / 2 + SEG / 2), H / 2, z, ry);
+    plane(DOOR, H - DOORH, mat, 0, DOORH + (H - DOORH) / 2, z, ry);
+  }
+
+  scene.add(new THREE.HemisphereLight(0xfff6ea, 0x3a2e24, 0.62));
+
+  ROOMS.forEach(function (room, i) {
+    var mat = new THREE.MeshLambertMaterial({ color: room.wall });
+    var z = cz(i);
+    plane(D, H, mat, -W / 2, H / 2, z, Math.PI / 2);
+    plane(D, H, mat, W / 2, H / 2, z, -Math.PI / 2);
+    if (i === 0) solidWall(z + D / 2 - WALL_T, Math.PI, mat); else doorWall(z + D / 2 - WALL_T, Math.PI, mat);
+    if (i === N - 1) solidWall(z - D / 2 + WALL_T, 0, mat); else doorWall(z - D / 2 + WALL_T, 0, mat);
+    // Zócalo
+    [-1, 1].forEach(function (s) {
+      var b = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.12, D), woodDark);
+      b.position.set(s * (W / 2 - 0.01), 0.06, z); scene.add(b);
+    });
+    // Marco de la puerta hacia la siguiente sala
+    if (i < N - 1) {
+      var zb = boundaryZ(i);
+      [-1, 1].forEach(function (s) {
+        var j = new THREE.Mesh(new THREE.BoxGeometry(0.12, DOORH, WALL_T * 2 + 0.04), woodDark);
+        j.position.set(s * (DOOR / 2 + 0.06), DOORH / 2, zb); scene.add(j);
+      });
+      var lt = new THREE.Mesh(new THREE.BoxGeometry(DOOR + 0.24, 0.12, WALL_T * 2 + 0.04), woodDark);
+      lt.position.set(0, DOORH + 0.06, zb); scene.add(lt);
+    }
+    // Rótulo grande de la sala sobre la pared del fondo
+    var band = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.6, (W - 0.6) * 260 / 2400), new THREE.MeshBasicMaterial({ map: bandText(room.eyebrow, room.title, room.accent), transparent: true, depthWrite: false }));
+    band.position.set(0, DOORH + (H - DOORH) / 2 + 0.02, z - D / 2 + WALL_T + 0.01);
+    scene.add(band);
+    // Banca
+    var seat = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 0.5), new THREE.MeshStandardMaterial({ color: 0x4a3324, roughness: 0.6 }));
+    seat.position.set(0, 0.45, z - 0.2); scene.add(seat);
+    [-0.75, 0.75].forEach(function (x) {
+      var leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.41, 0.42), woodDark);
+      leg.position.set(x, 0.205, z - 0.2); scene.add(leg);
+    });
+    var light = new THREE.PointLight(0xffefd9, 0.55, 14, 1.2);
+    light.position.set(0, H - 0.4, z + 0.5); scene.add(light);
+
+    // Obras
+    if (i === 0) {
+      addPhoto(0, 'img/01.jpg', 1, 'back', -3.1, 1.7, 1.7, 1.75, { eyebrow: 'Entrada', title: 'Fundación Niños de Paz', text: '' });
+      addText(0, 'back', 3.1, 1.75, { eyebrow: FOUNDATION.eyebrow, title: FOUNDATION.title, text: FOUNDATION.text, accent: room.accent, width: 3.0, maxH: 2.5 }, FOUNDATION);
+      addText(0, 'left', 0, 1.75, { eyebrow: ROUTE.eyebrow, title: ROUTE.title, text: ROUTE.text, accent: room.accent, width: 2.4, maxH: 2.4 }, ROUTE);
+    } else {
+      addText(i, 'left', 0, 1.7, { eyebrow: room.eyebrow, title: room.title, text: room.text, accent: room.accent, width: 2.9, maxH: 2.4 }, { eyebrow: room.eyebrow, title: room.title, text: room.text });
+      var slots = [['back', -3.1, 2.7, 2.0, 1.65], ['back', 3.1, 2.7, 2.0, 1.65], ['right', 0, 3.4, 2.2, 1.7]];
+      room.photos.forEach(function (ph, k) {
+        var s = slots[k];
+        addPhoto(i, ph.src, ph.a, s[0], s[1], s[2], s[3], s[4], {
+          eyebrow: room.eyebrow + ' · Foto ' + (k + 1) + ' de ' + room.photos.length,
+          title: room.title, text: ''
+        });
+      });
+    }
+  });
+  updateLoad();
+
+  // Volver a dibujar los textos cuando carguen las fuentes
+  if (document.fonts && document.fonts.load) {
+    Promise.all([
+      document.fonts.load('400 78px Gloock'),
+      document.fonts.load('400 37px Figtree'),
+      document.fonts.load('600 32px Figtree')
+    ]).then(function () { redraws.forEach(function (f) { f(); }); }).catch(function () {});
+  }
+
+  /* ---------- Cámara y movimiento ---------- */
+  var pos = new THREE.Vector3(0, EYE, D / 2 - 1.3);
+  var yaw = 0, pitch = -0.03;
+  var mode = 'walk';
+  var tween = null;
+  var current = -1;
+
+  function resize() {
+    var w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.fov = camera.aspect < 0.8 ? 74 : 62;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function blocked(x, z) {
+    var r = 0.45;
+    if (Math.abs(x) > W / 2 - r) return true;
+    if (z > D / 2 - WALL_T - r) return true;
+    if (z < cz(N - 1) - D / 2 + WALL_T + r) return true;
+    for (var i = 0; i < N - 1; i++) {
+      var zb = boundaryZ(i);
+      if (Math.abs(z - zb) < WALL_T + 0.4 && Math.abs(x) > DOOR / 2 - 0.32) return true;
+    }
+    return false;
+  }
+
+  /* ---------- Interfaz ---------- */
+  var hint = document.getElementById('hint');
+  var sheet = document.getElementById('sheet');
+  var sEyebrow = document.getElementById('sheet-eyebrow');
+  var sTitle = document.getElementById('sheet-title');
+  var sText = document.getElementById('sheet-text');
+  var prevBtn = document.getElementById('prev');
+  var nextBtn = document.getElementById('next');
+  var joyEl = document.getElementById('joy');
+  var knob = document.getElementById('knob');
+  var keysEl = document.getElementById('keys');
+  var roomEyebrow = document.getElementById('room-eyebrow');
+  var roomTitle = document.getElementById('room-title');
+  var menuBtn = document.getElementById('menu-btn');
+  var roomsEl = document.getElementById('rooms');
+  var hintTimer = setTimeout(hideHint, 10000);
+  function hideHint() { hint.classList.add('gone'); clearTimeout(hintTimer); }
+
+  var roomButtons = ROOMS.map(function (room, i) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    var e = document.createElement('span'); e.className = 'eyebrow'; e.textContent = i === 0 ? 'Entrada' : room.eyebrow;
+    var t = document.createElement('span'); t.textContent = room.title;
+    b.append(e, t);
+    b.addEventListener('click', function () { closeMenu(); goRoom(i); });
+    roomsEl.appendChild(b);
+    return b;
+  });
+  function openMenu() { roomsEl.hidden = false; menuBtn.setAttribute('aria-expanded', 'true'); hideHint(); }
+  function closeMenu() { roomsEl.hidden = true; menuBtn.setAttribute('aria-expanded', 'false'); }
+  menuBtn.addEventListener('click', function () { roomsEl.hidden ? openMenu() : closeMenu(); });
+
+  var shownRoom = -1;
+  function updateRoomChip() {
+    var r = roomOf(pos.z);
+    if (r === shownRoom) return;
+    shownRoom = r;
+    roomEyebrow.textContent = r === 0 ? 'Entrada' : ROOMS[r].eyebrow;
+    roomTitle.textContent = ROOMS[r].title;
+    roomButtons.forEach(function (b, i) { b.setAttribute('aria-current', i === r ? 'true' : 'false'); });
+  }
+
+  /* ---------- Recorridos animados ---------- */
+  function shortest(a, b) { var d = (b - a) % (Math.PI * 2); return ((d + Math.PI * 3) % (Math.PI * 2)) - Math.PI; }
+  function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+  function travel(toP, toYaw, toPitch, done) {
+    var pts = [pos.clone()];
+    var ra = roomOf(pos.z), rb = roomOf(toP.z);
+    var cross = ra !== rb;
+    if (cross) {
+      var step = rb > ra ? 1 : -1;
+      for (var i = ra; i !== rb; i += step) {
+        var b = step > 0 ? i : i - 1;
+        var zb = boundaryZ(b);
+        pts.push(new THREE.Vector3(0, EYE, zb + step * 1.0));
+        pts.push(new THREE.Vector3(0, EYE, zb - step * 1.0));
+      }
+    }
+    pts.push(toP.clone());
+    var segs = [], total = 0;
+    for (var k = 1; k < pts.length; k++) { var l = pts[k].distanceTo(pts[k - 1]); segs.push(l); total += l; }
+    var travelYaw = cross ? (rb > ra ? 0 : Math.PI) : null;
+    tween = {
+      pts: pts, segs: segs, total: total, t: 0,
+      dur: reduceMotion ? 0.001 : Math.min(4.2, Math.max(1.0, 0.8 + total / 5.5)),
+      fy: yaw, fp: pitch, ty: toYaw, tp: toPitch, travelYaw: travelYaw, done: done
+    };
+    mode = 'tween';
+  }
+  function stepTween(dt) {
+    var tw = tween;
+    tw.t += dt;
+    var u = Math.min(tw.t / tw.dur, 1), e = ease(u);
+    var d = e * tw.total, k = 0;
+    while (k < tw.segs.length - 1 && d > tw.segs[k]) { d -= tw.segs[k]; k++; }
+    var a = tw.pts[k], b = tw.pts[k + 1];
+    var f = tw.segs[k] > 0 ? Math.min(d / tw.segs[k], 1) : 1;
+    pos.lerpVectors(a, b, f);
+    if (tw.travelYaw === null) {
+      yaw = tw.fy + shortest(tw.fy, tw.ty) * e;
+      pitch = tw.fp + (tw.tp - tw.fp) * e;
+    } else if (e < 0.2) {
+      var q = e / 0.2;
+      yaw = tw.fy + shortest(tw.fy, tw.travelYaw) * q;
+      pitch = tw.fp * (1 - q);
+    } else if (e > 0.8) {
+      var q2 = (e - 0.8) / 0.2;
+      yaw = tw.travelYaw + shortest(tw.travelYaw, tw.ty) * q2;
+      pitch = tw.tp * q2;
+    } else { yaw = tw.travelYaw; pitch = 0; }
+    if (u >= 1) { tween = null; tw.done && tw.done(); }
+  }
+
+  function setUiHidden(h) {
+    joyEl.classList.toggle('ui-hidden', h);
+    keysEl.classList.toggle('ui-hidden', h);
+  }
+  function viewFor(item) {
+    var tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    var fw = item.w + 0.35, fh = item.h + 0.35;
+    var narrow = camera.aspect < 1;
+    var dV = (fh / 2) / tanH * (narrow ? 1.5 : 1.15);
+    var dH = (fw / 2) / (tanH * camera.aspect) * 1.06;
+    var dist = Math.min(Math.max(dV, dH, 1.3), W - 1.0);
+    var lift = narrow ? fh * 0.42 : fh * 0.1;
+    var p = item.center.clone().addScaledVector(item.n, dist);
+    p.y = item.center.y - lift;
+    return { p: p, yaw: Math.atan2(item.n.x, item.n.z) };
+  }
+  function focusItem(idx) {
+    closeMenu(); hideHint();
+    var item = items[idx];
+    current = idx;
+    sheet.classList.remove('open');
+    canvasEl.classList.remove('hot');
+    setUiHidden(true);
+    var v = viewFor(item);
+    travel(v.p, v.yaw, 0, function () {
+      mode = 'focus';
+      canvasEl.classList.add('focused');
+      sEyebrow.textContent = item.eyebrow;
+      sTitle.textContent = item.title;
+      sText.textContent = item.text || '';
+      sText.hidden = !item.text;
+      prevBtn.disabled = idx === 0;
+      nextBtn.disabled = idx === items.length - 1;
+      sheet.classList.add('open');
+    });
+  }
+  function unfocus() {
+    if (mode !== 'focus') return;
+    var item = items[current];
+    sheet.classList.remove('open');
+    canvasEl.classList.remove('focused');
+    var p = item.center.clone().addScaledVector(item.n, 3.4); p.y = EYE;
+    travel(p, Math.atan2(item.n.x, item.n.z), 0, function () { mode = 'walk'; setUiHidden(false); current = -1; });
+  }
+  function goRoom(i) {
+    if (mode === 'focus') { sheet.classList.remove('open'); canvasEl.classList.remove('focused'); }
+    setUiHidden(false);
+    travel(new THREE.Vector3(0, EYE, cz(i) + D / 2 - 1.3), 0, -0.03, function () { mode = 'walk'; current = -1; });
+  }
+  document.getElementById('back').addEventListener('click', unfocus);
+  prevBtn.addEventListener('click', function () { if (current > 0) focusItem(current - 1); });
+  nextBtn.addEventListener('click', function () { if (current < items.length - 1) focusItem(current + 1); });
+
+  /* ---------- Mirar, tocar y caminar ---------- */
+  var drag = null;
+  var raycaster = new THREE.Raycaster();
+  var ndc = new THREE.Vector2();
+  function pick(cx, cyy) {
+    var r = canvasEl.getBoundingClientRect();
+    ndc.x = ((cx - r.left) / r.width) * 2 - 1;
+    ndc.y = -((cyy - r.top) / r.height) * 2 + 1;
+    raycaster.setFromCamera(ndc, camera);
+    var hit = raycaster.intersectObjects(clickable, false)[0];
+    return hit && hit.distance < 16 ? hit.object.userData.item : -1;
+  }
+  canvasEl.addEventListener('pointerdown', function (e) {
+    if (drag) return;
+    closeMenu();
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: 0 };
+    try { canvasEl.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  canvasEl.addEventListener('pointermove', function (e) {
+    if (drag && e.pointerId === drag.id) {
+      var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      drag.x = e.clientX; drag.y = e.clientY;
+      drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy));
+      if (mode === 'walk' && drag.moved > 4) {
+        canvasEl.classList.add('dragging');
+        var k = e.pointerType === 'touch' ? 0.006 : 0.004;
+        yaw += dx * k;
+        pitch = Math.max(-1.0, Math.min(1.0, pitch + dy * k));
+        hideHint();
+      }
+    } else if (!drag && e.pointerType === 'mouse' && mode !== 'tween') {
+      var hit = pick(e.clientX, e.clientY);
+      canvasEl.classList.toggle('hot', hit >= 0 && hit !== current);
+    }
+  });
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    var tap = drag.moved < 6;
+    drag = null;
+    canvasEl.classList.remove('dragging');
+    if (!tap || mode === 'tween') return;
+    var hit = pick(e.clientX, e.clientY);
+    if (hit >= 0 && hit !== current) focusItem(hit);
+    else if (mode === 'focus') unfocus();
+  }
+  canvasEl.addEventListener('pointerup', endDrag);
+  canvasEl.addEventListener('pointercancel', function (e) { if (drag && e.pointerId === drag.id) { drag = null; canvasEl.classList.remove('dragging'); } });
+
+  var joy = { x: 0, y: 0, id: null };
+  function setKnob(px, py) { knob.style.transform = 'translate(' + px + 'px,' + py + 'px)'; }
+  function joyMove(e) {
+    var r = joyEl.getBoundingClientRect();
+    var dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    var max = r.width / 2 - 18, len = Math.hypot(dx, dy);
+    if (len > max) { dx *= max / len; dy *= max / len; }
+    setKnob(dx, dy);
+    joy.x = dx / max; joy.y = dy / max;
+  }
+  joyEl.addEventListener('pointerdown', function (e) {
+    joy.id = e.pointerId; closeMenu();
+    try { joyEl.setPointerCapture(e.pointerId); } catch (err) {}
+    joyMove(e); hideHint();
+  });
+  joyEl.addEventListener('pointermove', function (e) { if (e.pointerId === joy.id) joyMove(e); });
+  function joyEnd(e) { if (e.pointerId !== joy.id) return; joy.id = null; joy.x = joy.y = 0; setKnob(0, 0); }
+  joyEl.addEventListener('pointerup', joyEnd);
+  joyEl.addEventListener('pointercancel', joyEnd);
+
+  var keys = {};
+  window.addEventListener('keydown', function (e) {
+    var k = e.key.toLowerCase();
+    if (k === 'escape') { if (!roomsEl.hidden) closeMenu(); else unfocus(); return; }
+    if (mode === 'focus') {
+      if (k === 'arrowright' && current < items.length - 1) { focusItem(current + 1); e.preventDefault(); }
+      if (k === 'arrowleft' && current > 0) { focusItem(current - 1); e.preventDefault(); }
+      return;
+    }
+    if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].indexOf(k) >= 0) {
+      keys[k] = true; hideHint(); e.preventDefault();
+    }
+  });
+  window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
+  window.addEventListener('blur', function () { keys = {}; });
+
+  /* ---------- Bucle ---------- */
+  var clock = new THREE.Clock();
+  function loop() {
+    var dt = Math.min(clock.getDelta(), 0.05);
+    if (mode === 'walk') {
+      var fwd = -joy.y + ((keys.w || keys.arrowup) ? 1 : 0) - ((keys.s || keys.arrowdown) ? 1 : 0);
+      var side = joy.x + ((keys.d || keys.arrowright) ? 1 : 0) - ((keys.a || keys.arrowleft) ? 1 : 0);
+      var len = Math.hypot(fwd, side);
+      if (len > 1) { fwd /= len; side /= len; }
+      var speed = 2.6 * dt;
+      var sy = Math.sin(yaw), cyw = Math.cos(yaw);
+      var dx = (-sy * fwd + cyw * side) * speed;
+      var dz = (-cyw * fwd - sy * side) * speed;
+      if (!blocked(pos.x + dx, pos.z)) pos.x += dx;
+      if (!blocked(pos.x, pos.z + dz)) pos.z += dz;
+    } else if (mode === 'tween' && tween) {
+      stepTween(dt);
+    }
+    camera.position.copy(pos);
+    camera.rotation.y = yaw;
+    camera.rotation.x = pitch;
+    updateRoomChip();
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+  }
+  loop();
+
+  function showFail() {
+    var d = document.createElement('div');
+    d.className = 'fail';
+    d.textContent = 'Tu navegador no pudo iniciar el modo 3D. Prueba abrir la página en Chrome, Safari o Firefox actualizados.';
+    document.body.appendChild(d);
+  }
+})();
+</script>
+
+</body>
+</html>
