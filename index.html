@@ -202,6 +202,12 @@ body {
 .btn.primary { color: var(--night); background: var(--leaf); border-color: transparent; }
 .btn:focus-visible { outline: 2px solid var(--leaf); outline-offset: 2px; }
 .opt-name { display: grid; gap: 8px; font-size: 15px; font-weight: 500; }
+.opt-range { display: grid; gap: 8px; font-size: 15px; font-weight: 500; }
+.opt-range label { display: flex; justify-content: space-between; gap: 12px; }
+.opt-range output { font-weight: 400; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.opt-range input { width: 100%; accent-color: var(--leaf); cursor: pointer; }
+.opt-range input:disabled { opacity: 0.4; cursor: default; }
+.opt-range input:focus-visible { outline: 2px solid var(--leaf); outline-offset: 2px; }
 .opt-name .row { display: flex; gap: 8px; }
 .avatar-panel {
   position: fixed;
@@ -331,6 +337,14 @@ body {
     </div>
   </form>
   <button class="btn" type="button" id="open-avatar">Personalizar avatar</button>
+  <div class="opt-range">
+    <label for="others-opacity">Opacidad de los demás visitantes <output id="others-opacity-out" for="others-opacity">100%</output></label>
+    <input type="range" id="others-opacity" min="10" max="100" step="5" value="100">
+  </div>
+  <label class="opt" for="hide-others">
+    <input type="checkbox" id="hide-others">
+    <span>Ocultar a los demás visitantes<small>Dejas de ver sus figuras y nombres. Ellos te siguen viendo y el contador sigue funcionando.</small></span>
+  </label>
   <label class="opt pc-only" for="invert">
     <input type="checkbox" id="invert">
     <span>Invertir cámara<small>Cambia la dirección en la que gira la vista al mover el mouse.</small></span>
@@ -1249,6 +1263,7 @@ body {
     label.position.y = EYE + 0.36;
     grp.add(fig, label);
     grp.visible = false;
+    if (othersOpacity < 0.999) applyOpacity(grp, othersOpacity);
     scene.add(grp);
     return { id: id, name: name, color: color, group: grp, fig: fig, avKey: JSON.stringify(av), label: label, target: new THREE.Vector3(), tyaw: 0, yaw: 0, room: 0, seen: false };
   }
@@ -1266,6 +1281,7 @@ body {
     p.group.remove(p.fig);
     disposeObj(p.fig);
     p.fig = buildFigure(av);
+    if (othersOpacity < 0.999) applyOpacity(p.fig, othersOpacity);
     p.group.add(p.fig);
     p.avKey = key;
   }
@@ -1283,6 +1299,51 @@ body {
     disposeObj(p.group);
     delete peers[id];
   }
+
+  /* Opacidad y visibilidad de los demás visitantes */
+  var othersOpacity = 1, hideOthers = false;
+  try {
+    var so = parseFloat(localStorage.getItem('galeria-opacidad-otros'));
+    if (so >= 0.1 && so <= 1) othersOpacity = so;
+    hideOthers = localStorage.getItem('galeria-ocultar-otros') === '1';
+  } catch (err) {}
+  function applyOpacity(obj, op) {
+    obj.traverse(function (o) {
+      var m = o.material;
+      if (!m) return;
+      if (!m.userData.base) m.userData.base = { o: m.opacity, t: m.transparent, dw: m.depthWrite };
+      var b = m.userData.base;
+      var wantT = op < 0.999 || b.t;
+      if (m.transparent !== wantT) m.needsUpdate = true;
+      m.transparent = wantT;
+      m.opacity = b.o * op;
+      m.depthWrite = op < 0.999 ? false : b.dw;
+    });
+  }
+  var opRange = document.getElementById('others-opacity');
+  var opOut = document.getElementById('others-opacity-out');
+  var hideEl = document.getElementById('hide-others');
+  function syncOthersUi() {
+    opRange.value = Math.round(othersOpacity * 100);
+    opOut.textContent = Math.round(othersOpacity * 100) + '%';
+    hideEl.checked = hideOthers;
+    opRange.disabled = hideOthers;
+  }
+  function applyOthers() {
+    Object.keys(peers).forEach(function (id) { applyOpacity(peers[id].group, othersOpacity); });
+  }
+  opRange.addEventListener('input', function () {
+    othersOpacity = Math.max(0.1, Math.min(1, opRange.value / 100));
+    opOut.textContent = Math.round(othersOpacity * 100) + '%';
+    try { localStorage.setItem('galeria-opacidad-otros', String(othersOpacity)); } catch (err) {}
+    applyOthers();
+  });
+  hideEl.addEventListener('change', function () {
+    hideOthers = hideEl.checked;
+    try { localStorage.setItem('galeria-ocultar-otros', hideOthers ? '1' : '0'); } catch (err) {}
+    syncOthersUi();
+  });
+  syncOthersUi();
 
   var lastSent = 0, lastPos = new THREE.Vector3(1e9, 0, 0), lastYaw = 1e9, forceSend = false;
   function sendPos(now) {
@@ -1365,7 +1426,7 @@ body {
       p.yaw += shortest(p.yaw, p.tyaw) * f;
       p.group.rotation.y = p.yaw;
       var dx = p.group.position.x - pos.x, dz = p.group.position.z - pos.z;
-      p.group.visible = dx * dx + dz * dz > 0.6;
+      p.group.visible = !hideOthers && dx * dx + dz * dz > 0.6;
     });
     if (connected && now - lastSent > 240) {
       var moved = pos.distanceToSquared(lastPos) > 0.0009 || Math.abs(shortest(lastYaw, yaw)) > 0.02;
