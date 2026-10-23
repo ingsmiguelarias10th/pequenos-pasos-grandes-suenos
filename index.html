@@ -172,9 +172,49 @@ body {
   transition: opacity 0.3s ease;
 }
 @media (pointer: coarse) {
-  .keys, #opts-btn { display: none; }
-  .chip { max-width: min(360px, calc(100% - 150px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); }
+  .keys, .pc-only { display: none; }
+  .chip { max-width: min(360px, calc(100% - 210px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); }
 }
+.online { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-soft); }
+.online::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--leaf); flex: none; }
+.online.off::before { background: var(--ink-soft); opacity: 0.6; }
+.rooms .count { font-size: 12px; font-weight: 400; color: var(--ink-soft); }
+.field {
+  width: 100%; min-width: 0;
+  font: 400 16px var(--body);
+  color: var(--ink);
+  background: rgba(244, 237, 226, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.field:focus-visible { outline: 2px solid var(--leaf); outline-offset: 1px; }
+.btn {
+  font: 600 14px var(--body);
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  color: var(--ink);
+  background: rgba(244, 237, 226, 0.08);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.btn.primary { color: var(--night); background: var(--leaf); border-color: transparent; }
+.btn:focus-visible { outline: 2px solid var(--leaf); outline-offset: 2px; }
+.opt-name { display: grid; gap: 8px; font-size: 15px; font-weight: 500; }
+.opt-name .row { display: flex; gap: 8px; }
+.welcome {
+  position: fixed; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(400px, calc(100% - 32px));
+  padding: 20px;
+  border-radius: 14px;
+  display: grid; gap: 10px;
+}
+.welcome h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 25px; line-height: 1.15; }
+.welcome p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+.welcome form { display: grid; gap: 12px; margin-top: 4px; }
+.welcome .row { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .sheet {
   position: fixed;
@@ -226,6 +266,7 @@ body {
   <span class="eyebrow" id="room-eyebrow">Entrada</span>
   <strong id="room-title">Pequeños pasos, grandes sueños</strong>
   <span class="load" id="load">Cargando fotos…</span>
+  <span class="online off" id="online">Conectando…</span>
 </div>
 
 <div class="top-actions">
@@ -233,16 +274,36 @@ body {
   <button class="menu-btn panel" id="menu-btn" type="button" aria-expanded="false" aria-controls="rooms">Salas</button>
 </div>
 <nav class="rooms panel" id="rooms" hidden aria-label="Ir a una sala"></nav>
-<div class="opts panel" id="opts" hidden role="group" aria-label="Opciones de cámara">
-  <label class="opt" for="invert">
+<div class="opts panel" id="opts" hidden role="group" aria-label="Opciones">
+  <form class="opt-name" id="name-form">
+    <label for="name-edit">Tu nombre en la galería</label>
+    <div class="row">
+      <input class="field" id="name-edit" maxlength="24" autocomplete="nickname" placeholder="Tu nombre">
+      <button class="btn" type="submit">Guardar</button>
+    </div>
+  </form>
+  <label class="opt pc-only" for="invert">
     <input type="checkbox" id="invert">
     <span>Invertir cámara<small>Cambia la dirección en la que gira la vista al mover el mouse.</small></span>
   </label>
-  <p class="opt-note" style="margin:0">Pulsa <kbd>Shift</kbd> izquierdo para fijar el cursor y mirar solo moviendo el mouse. Haz clic sobre una foto con el punto del centro para acercarte. Pulsa <kbd>Shift</kbd> otra vez o <kbd>Esc</kbd> para soltarlo.</p>
+  <p class="opt-note pc-only" style="margin:0">Pulsa <kbd>Shift</kbd> izquierdo para fijar el cursor y mirar solo moviendo el mouse. Haz clic sobre una foto con el punto del centro para acercarte. Pulsa <kbd>Shift</kbd> otra vez o <kbd>Esc</kbd> para soltarlo.</p>
 </div>
 <div class="cross" id="cross" hidden></div>
 
-<div class="hint panel" id="hint">Arrastra para mirar alrededor. Usa el control o las teclas para caminar. Toca una foto o un texto para acercarte.</div>
+<div class="welcome panel" id="welcome" role="dialog" aria-labelledby="welcome-title">
+  <span class="eyebrow">Galería compartida</span>
+  <h2 id="welcome-title">¿Cómo te llamas?</h2>
+  <p>Si hay más personas recorriendo la galería, verán tu nombre sobre tu figura y tú verás el de ellas.</p>
+  <form id="welcome-form">
+    <input class="field" id="visitor-name" maxlength="24" autocomplete="nickname" placeholder="Tu nombre">
+    <div class="row">
+      <button class="btn primary" type="submit">Entrar</button>
+      <button class="btn" type="button" id="skip-name">Entrar sin nombre</button>
+    </div>
+  </form>
+</div>
+
+<div class="hint panel gone" id="hint">Arrastra para mirar alrededor. Usa el control o las teclas para caminar. Toca una foto o un texto para acercarte.</div>
 
 <div class="joy panel" id="joy" aria-label="Control para caminar"><div class="knob" id="knob"></div></div>
 <div class="keys panel" id="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> para caminar, <kbd>Shift</kbd> izq. para fijar el cursor</div>
@@ -259,6 +320,7 @@ body {
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script>
 (function () {
   /* ---------- Contenido tomado del documento ---------- */
@@ -657,7 +719,8 @@ body {
     try { localStorage.setItem('galeria-invertir', invert ? '1' : '0'); } catch (err) {}
   });
   function inv() { return invert ? -1 : 1; }
-  var hintTimer = setTimeout(hideHint, 10000);
+  var hintTimer = null;
+  function showHint() { hint.classList.remove('gone'); clearTimeout(hintTimer); hintTimer = setTimeout(hideHint, 10000); }
   function hideHint() { hint.classList.add('gone'); clearTimeout(hintTimer); }
 
   var roomButtons = ROOMS.map(function (room, i) {
@@ -665,7 +728,9 @@ body {
     b.type = 'button';
     var e = document.createElement('span'); e.className = 'eyebrow'; e.textContent = i === 0 ? 'Entrada' : room.eyebrow;
     var t = document.createElement('span'); t.textContent = room.title;
-    b.append(e, t);
+    var c = document.createElement('span'); c.className = 'count';
+    b.append(e, t, c);
+    b._count = c;
     b.addEventListener('click', function () { closeMenu(); goRoom(i); });
     roomsEl.appendChild(b);
     return b;
@@ -900,6 +965,9 @@ body {
 
   var keys = {};
   window.addEventListener('keydown', function (e) {
+    var tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (!welcome.hidden) return;
     var k = e.key.toLowerCase();
     if (e.code === 'ShiftLeft' && !e.repeat) {
       if (locked) unlockCursor(); else lockCursor();
@@ -921,6 +989,189 @@ body {
   });
   window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
   window.addEventListener('blur', function () { keys = {}; });
+
+  /* ---------- Visitantes en tiempo real (Supabase Realtime) ---------- */
+  var SUPABASE_URL = 'https://ezfrrqbnggldvxaxupch.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_jx8Rcu4bryvBRqIzs8-PNQ_qWOZE8Ye';
+  var COLORS = ['#e07a5f', '#3d8bd4', '#81b29a', '#f2cc8f', '#b56fd1', '#e9707f', '#4fb6b0', '#d99a3d'];
+  var welcome = document.getElementById('welcome');
+  var welcomeForm = document.getElementById('welcome-form');
+  var nameInput = document.getElementById('visitor-name');
+  var nameForm = document.getElementById('name-form');
+  var nameEdit = document.getElementById('name-edit');
+  var onlineEl = document.getElementById('online');
+
+  function makeId() {
+    try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (err) {}
+    return 'v' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
+  function hashStr(str) { var h = 0; for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return Math.abs(h); }
+  function cleanName(n) { return String(n || '').replace(/\s+/g, ' ').trim().slice(0, 24); }
+
+  var me = { id: makeId(), name: '' };
+  me.color = COLORS[hashStr(me.id) % COLORS.length];
+  me.fallback = 'Visitante ' + (10 + hashStr(me.id) % 90);
+  try { me.name = cleanName(localStorage.getItem('galeria-nombre')); } catch (err) {}
+  nameInput.value = me.name; nameEdit.value = me.name;
+  function displayName() { return me.name || me.fallback; }
+
+  var peers = {};
+  var channel = null, connected = false;
+
+  function labelTexture(text, color) {
+    var c = document.createElement('canvas'); c.width = 512; c.height = 112;
+    var g = c.getContext('2d');
+    g.font = '600 46px Figtree, system-ui, sans-serif';
+    var w = Math.min(492, g.measureText(text).width + 64);
+    var x = (512 - w) / 2;
+    g.fillStyle = 'rgba(23,19,15,0.82)';
+    g.beginPath();
+    if (g.roundRect) g.roundRect(x, 14, w, 84, 42); else g.rect(x, 14, w, 84);
+    g.fill();
+    g.fillStyle = color; g.beginPath(); g.arc(x + 34, 56, 9, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#f4ede2'; g.textAlign = 'left'; g.textBaseline = 'middle';
+    g.fillText(text, x + 54, 58, w - 70);
+    var t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+  }
+  function makeAvatar(id, name, color) {
+    var grp = new THREE.Group();
+    var mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.55 });
+    var body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.27, 1.12, 20), mat);
+    body.position.y = 0.6;
+    var head = new THREE.Mesh(new THREE.SphereGeometry(0.19, 24, 16), mat);
+    head.position.y = EYE - 0.12;
+    var visor = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.07, 0.06), new THREE.MeshStandardMaterial({ color: 0x1d1814, roughness: 0.3 }));
+    visor.position.set(0, EYE - 0.09, -0.17);
+    var label = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(name, color), transparent: true, depthWrite: false }));
+    label.scale.set(0.95, 0.21, 1);
+    label.position.y = EYE + 0.32;
+    grp.add(body, head, visor, label);
+    grp.visible = false;
+    scene.add(grp);
+    return { id: id, name: name, color: color, group: grp, label: label, target: new THREE.Vector3(), tyaw: 0, yaw: 0, room: 0, seen: false };
+  }
+  function setPeerName(p, name, color) {
+    if (p.name === name && p.color === color) return;
+    p.name = name; p.color = color;
+    p.group.children[0].material.color.set(color);
+    var old = p.label.material.map;
+    p.label.material.map = labelTexture(name, color);
+    p.label.material.needsUpdate = true;
+    if (old) old.dispose();
+  }
+  function ensurePeer(id, name, color) {
+    var p = peers[id];
+    if (!p) { p = peers[id] = makeAvatar(id, name || 'Visitante', color || '#cccccc'); }
+    else if (name) setPeerName(p, name, color || p.color);
+    return p;
+  }
+  function removePeer(id) {
+    var p = peers[id];
+    if (!p) return;
+    scene.remove(p.group);
+    p.group.traverse(function (o) { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
+    delete peers[id];
+  }
+
+  var lastSent = 0, lastPos = new THREE.Vector3(1e9, 0, 0), lastYaw = 1e9, forceSend = false;
+  function sendPos(now) {
+    if (!connected) return;
+    lastSent = now; lastPos.copy(pos); lastYaw = yaw; forceSend = false;
+    try {
+      var r = channel.send({ type: 'broadcast', event: 'pos', payload: {
+        id: me.id, x: +pos.x.toFixed(2), z: +pos.z.toFixed(2), yaw: +yaw.toFixed(3), room: roomOf(pos.z)
+      } });
+      if (r && r.catch) r.catch(function () {});
+    } catch (err) {}
+  }
+  function trackMe() {
+    if (!connected) return;
+    try {
+      var r = channel.track({ name: displayName(), color: me.color });
+      if (r && r.catch) r.catch(function () {});
+    } catch (err) {}
+  }
+  function syncPeers() {
+    var state = channel.presenceState();
+    var present = {};
+    Object.keys(state).forEach(function (key) {
+      if (key === me.id) return;
+      var meta = state[key][state[key].length - 1] || {};
+      present[key] = true;
+      ensurePeer(key, cleanName(meta.name) || 'Visitante', meta.color);
+    });
+    Object.keys(peers).forEach(function (id) { if (!present[id]) removePeer(id); });
+  }
+  function updateCounts() {
+    var counts = ROOMS.map(function () { return 0; });
+    counts[roomOf(pos.z)]++;
+    var n = 1;
+    Object.keys(peers).forEach(function (id) { n++; if (peers[id].seen) counts[peers[id].room]++; });
+    if (!connected) { onlineEl.textContent = 'Recorrido individual'; onlineEl.classList.add('off'); }
+    else {
+      onlineEl.classList.remove('off');
+      onlineEl.textContent = n === 1 ? 'Solo tú en la galería' : n + ' personas en la galería';
+    }
+    roomButtons.forEach(function (b, i) {
+      var others = counts[i] - (i === roomOf(pos.z) ? 1 : 0);
+      b._count.textContent = connected && others > 0 ? (others === 1 ? '1 persona aquí' : others + ' personas aquí') : '';
+    });
+  }
+
+  function connect() {
+    if (!window.supabase || !window.supabase.createClient) { updateCounts(); return; }
+    try {
+      var client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+      channel = client.channel('galeria-pequenos-pasos', { config: { presence: { key: me.id }, broadcast: { self: false } } });
+      channel
+        .on('presence', { event: 'sync' }, function () { syncPeers(); updateCounts(); })
+        .on('presence', { event: 'join' }, function (ev) {
+          if (ev.key !== me.id) setTimeout(function () { forceSend = true; }, Math.random() * 400);
+        })
+        .on('broadcast', { event: 'pos' }, function (msg) {
+          var d = msg && msg.payload;
+          if (!d || !d.id || d.id === me.id) return;
+          var p = ensurePeer(d.id);
+          p.target.set(+d.x || 0, 0, +d.z || 0);
+          p.tyaw = +d.yaw || 0;
+          p.room = Math.max(0, Math.min(N - 1, d.room | 0));
+          if (!p.seen) { p.seen = true; p.group.position.copy(p.target); p.yaw = p.tyaw; p.group.visible = true; }
+        })
+        .subscribe(function (status) {
+          if (status === 'SUBSCRIBED') { connected = true; trackMe(); forceSend = true; }
+          else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') { connected = false; }
+          updateCounts();
+        });
+    } catch (err) { connected = false; updateCounts(); }
+  }
+  function stepPeers(dt, now) {
+    var f = 1 - Math.exp(-dt * 9);
+    Object.keys(peers).forEach(function (id) {
+      var p = peers[id];
+      if (!p.seen) return;
+      p.group.position.lerp(p.target, f);
+      p.yaw += shortest(p.yaw, p.tyaw) * f;
+      p.group.rotation.y = p.yaw;
+    });
+    if (connected && now - lastSent > 240) {
+      var moved = pos.distanceToSquared(lastPos) > 0.0009 || Math.abs(shortest(lastYaw, yaw)) > 0.02;
+      if (moved || forceSend) sendPos(now);
+    }
+  }
+
+  function setName(n) {
+    me.name = cleanName(n);
+    try { localStorage.setItem('galeria-nombre', me.name); } catch (err) {}
+    nameInput.value = me.name; nameEdit.value = me.name;
+    trackMe();
+  }
+  function closeWelcome() { welcome.hidden = true; showHint(); }
+  welcomeForm.addEventListener('submit', function (e) { e.preventDefault(); setName(nameInput.value); closeWelcome(); });
+  document.getElementById('skip-name').addEventListener('click', function () { closeWelcome(); });
+  nameForm.addEventListener('submit', function (e) { e.preventDefault(); setName(nameEdit.value); closeOpts(); });
+  if (me.name) { welcome.hidden = true; showHint(); }
+  connect();
+  setInterval(updateCounts, 1000);
 
   /* ---------- Bucle ---------- */
   var clock = new THREE.Clock();
@@ -944,6 +1195,7 @@ body {
     camera.rotation.y = yaw;
     camera.rotation.x = pitch;
     updateRoomChip();
+    stepPeers(dt, performance.now());
     if (locked && mode === 'walk') cross.classList.toggle('on', pick(0, 0) >= 0);
     renderer.render(scene, camera);
     requestAnimationFrame(loop);
