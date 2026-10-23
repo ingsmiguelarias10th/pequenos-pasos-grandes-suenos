@@ -664,7 +664,8 @@ body {
   }
 
   /* ---------- Cámara y movimiento ---------- */
-  var pos = new THREE.Vector3(0, EYE, D / 2 - 1.3);
+  // Cada visitante aparece en un punto distinto de la entrada
+  var pos = new THREE.Vector3((Math.random() * 2 - 1) * 2.6, EYE, D / 2 - 1.1 - Math.random() * 1.4);
   var yaw = 0, pitch = -0.03;
   var mode = 'walk';
   var tween = null;
@@ -1152,6 +1153,8 @@ body {
       p.group.position.lerp(p.target, f);
       p.yaw += shortest(p.yaw, p.tyaw) * f;
       p.group.rotation.y = p.yaw;
+      var dx = p.group.position.x - pos.x, dz = p.group.position.z - pos.z;
+      p.group.visible = dx * dx + dz * dz > 0.6;
     });
     if (connected && now - lastSent > 240) {
       var moved = pos.distanceToSquared(lastPos) > 0.0009 || Math.abs(shortest(lastYaw, yaw)) > 0.02;
