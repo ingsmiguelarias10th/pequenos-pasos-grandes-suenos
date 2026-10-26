@@ -399,8 +399,21 @@ body {
   /* ---------- Contenido tomado del documento ---------- */
   var ROOMS = [
     {
+      kind: 'entrance',
       eyebrow: 'Galería', title: 'Pequeños pasos, grandes sueños', short: 'Entrada',
       wall: 0xefeae1, accent: '#5e9b2e'
+    },
+    {
+      kind: 'about',
+      eyebrow: 'Proyecto social', title: 'Sobre el proyecto',
+      panels: [
+        { title: 'Objetivo general', text: 'Contribuir al bienestar de los niños y jóvenes de la Fundación Niños de Paz de Floridablanca mediante actividades de orientación educativa y espiritual que fortalezcan su desarrollo personal, sus valores y su motivación, acompañadas de espacios recreativos y acciones de apoyo a algunas de sus necesidades.' },
+        { title: 'Justificación', text: 'El proyecto social necesita desarrollarse para contribuir al bienestar integral de los jóvenes y miembros de la Fundación Niños de Paz. Los niños y jóvenes enfrentan limitaciones económicas y sociales que dificultan su acceso a recursos educativos, recreativos y a espacios adecuados para su desarrollo. Ante esta realidad, el proyecto busca generar acciones de acompañamiento que fortalezcan las oportunidades dentro de la Fundación.' },
+        { title: 'Motivación', text: 'El proyecto tuvo como motivación el deseo de ayudar a una población vulnerable y, por experiencias previas vividas por miembros del proyecto, notamos una mayor facilidad para tratar con población joven. Además, el carisma y espíritu de acogida de los jóvenes y los miembros de la fundación nos motivó a realizar este proyecto.' },
+        { title: 'Enfoque y valores', text: 'El proyecto social trabaja desde un enfoque espiritual y cristiano. Promueve principios como el amor al prójimo, la solidaridad, la empatía, el respeto, el servicio y la esperanza.' },
+        { title: 'Actividades', text: 'El proyecto contempla actividades educativas, recreativas y de integración. También busca fortalecer los vínculos comunitarios con los miembros de la fundación y fomentar una actitud de servicio.' }
+      ],
+      wall: 0xf1e6da, accent: '#9a5b2e'
     },
     {
       eyebrow: 'Visita 1', title: 'Diagnóstico',
@@ -431,15 +444,33 @@ body {
       text: 'Con todos los jóvenes escribimos cartas para cada uno de los padrinos que apadrinaría a un joven. No eran solo palabras en papel, eran la materialización de los sueños, la alegría y el carisma de cada niño.',
       photos: [{ src: 'img/13.jpg', a: 1400 / 1054 }, { src: 'img/14.jpg', a: 1053 / 1400 }],
       wall: 0xe4e5f0, accent: '#555a9a'
+    },
+    {
+      eyebrow: 'Visita 6', title: 'Realizando las cajas',
+      text: 'Este día hicimos la realización de las cajas junto a la decoración de las mismas. Además, compartimos un espacio ameno y cena, no solo como fundación, sino también como una familia.',
+      photos: [{ src: 'img/15.jpg', a: 830 / 1107 }, { src: 'img/16.jpg', a: 737 / 983 }, { src: 'img/17.jpg', a: 584 / 779 }],
+      wall: 0xeef0dc, accent: '#6a7520'
+    },
+    {
+      eyebrow: 'Visita 7', title: 'Entre lentes y ambientes',
+      text: 'En este día, en compañía de otro grupo voluntario, en la fundación se hizo una convocatoria para dar lentes a personas mayores de 14 años. Con esto aprendimos que, con las personas y el momento oportunos, se pueden lograr grandes cosas.',
+      photos: [{ src: 'img/18.jpg', a: 850 / 640 }, { src: 'img/19.jpg', a: 1073 / 808 }, { src: 'img/20.jpg', a: 1060 / 798 }],
+      wall: 0xdfe8f2, accent: '#2f5f94'
+    },
+    {
+      kind: 'final',
+      eyebrow: 'Continuará', title: 'El proyecto aún no termina',
+      wall: 0xebe3f1, accent: '#6a4a9a'
     }
   ];
+  ROOMS.forEach(function (r) { if (!r.kind) r.kind = 'visit'; });
   var FOUNDATION = {
     eyebrow: 'Entrada', title: 'Fundación Niños de Paz',
     text: 'Esta es una fundación fundada por Isaías y su esposa que se enfoca en enseñar valores a los jóvenes, desde los 0 a los 14 años. Nos sentimos impulsados a ir a esta fundación por cómo se alineaban los valores promovidos a los jóvenes con nuestro fundamento cristiano y humano. Además, la inspiración y alegría que nos daba compartir con jóvenes fue otro motivo clave para acompañar a esta fundación en este semestre.'
   };
   var ROUTE = {
-    eyebrow: 'Recorrido', title: 'Cinco visitas',
-    text: ROOMS.slice(1).map(function (r) { return r.eyebrow + '. ' + r.title; }).join('\n')
+    eyebrow: 'Recorrido', title: 'Las salas',
+    text: ROOMS.slice(1).map(function (r) { return r.kind === 'about' ? r.title : r.eyebrow + '. ' + r.title; }).join('\n')
   };
 
   if (!window.THREE) { showFail(); return; }
@@ -562,13 +593,15 @@ body {
     return { tex: tex, w: wM, h: hM };
   }
   // Rótulo grande sobre la puerta
-  function bandText(eyebrow, title, accent) {
+  function bandText(eyebrow, title, accent, style) {
+    style = style || {};
     var c = document.createElement('canvas'); c.width = 2400; c.height = 260;
     var g = c.getContext('2d');
     var tex = new THREE.CanvasTexture(c);
     tex.encoding = THREE.sRGBEncoding; tex.anisotropy = maxAniso;
     function draw() {
       g.clearRect(0, 0, c.width, c.height);
+      if (style.bg) { g.fillStyle = style.bg; g.fillRect(0, 0, c.width, c.height); }
       g.textAlign = 'center';
       g.fillStyle = accent;
       g.font = '600 36px Figtree, system-ui, sans-serif';
@@ -576,7 +609,7 @@ body {
       var size = 128;
       g.font = '400 ' + size + 'px Gloock, Georgia, serif';
       while (g.measureText(title).width > 2280 && size > 60) { size -= 4; g.font = '400 ' + size + 'px Gloock, Georgia, serif'; }
-      g.fillStyle = '#231d18';
+      g.fillStyle = style.fg || '#231d18';
       g.fillText(title, 1200, 210);
       tex.needsUpdate = true;
     }
@@ -650,6 +683,61 @@ body {
     clickable.push(m);
   }
 
+  // Cuadro de pie en el centro de la sala final. No tiene colisión, así que se puede atravesar caminando.
+  var passFrame = null;
+  function addPassFrame(roomIdx, room) {
+    var z = cz(roomIdx) - 1.0;
+    var w = 1.8, h = 2.4, bottom = 0.14;
+    var cy = bottom + h / 2;
+    var g = new THREE.Group();
+    g.position.set(0, 0, z);
+    var goldMat = new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: 0.35, metalness: 0.55 });
+    var t = 0.13, d = 0.1;
+    var top = new THREE.Mesh(new THREE.BoxGeometry(w + t * 2, t, d), goldMat); top.position.set(0, bottom + h + t / 2, 0);
+    var bot = new THREE.Mesh(new THREE.BoxGeometry(w + t * 2, t * 0.6, d), goldMat); bot.position.set(0, bottom - t * 0.3, 0);
+    var lft = new THREE.Mesh(new THREE.BoxGeometry(t, h + t * 1.6, d), goldMat); lft.position.set(-(w / 2 + t / 2), cy + t * 0.2, 0);
+    var rgt = lft.clone(); rgt.position.x = w / 2 + t / 2;
+    g.add(top, bot, lft, rgt);
+    [-1, 1].forEach(function (sx) {
+      var foot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.8), woodDark);
+      foot.position.set(sx * (w / 2 + t / 2), 0.03, 0); g.add(foot);
+    });
+    var canvasMat = new THREE.MeshBasicMaterial({ color: 0xf6f2ea, side: THREE.DoubleSide });
+    var canvasMesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), canvasMat);
+    canvasMesh.position.set(0, cy, 0);
+    g.add(canvasMesh);
+    // Estandarte colgado del techo con el mensaje grande
+    var bw = 6.4, bh = bw * 260 / 2400, by = 3.3;
+    var bannerTex = bandText(room.eyebrow, room.title, '#e7c873', { bg: '#3f2c5e', fg: '#f6f0e6' });
+    var banner = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), new THREE.MeshBasicMaterial({ map: bannerTex }));
+    banner.position.set(0, by, 0.02);
+    var bannerBack = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), new THREE.MeshBasicMaterial({ color: 0x3f2c5e }));
+    bannerBack.position.set(0, by, 0.01); bannerBack.rotation.y = Math.PI;
+    var rod = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, bw + 0.3, 12), goldMat);
+    rod.rotation.z = Math.PI / 2; rod.position.set(0, by + bh / 2 + 0.03, 0.015);
+    g.add(banner, bannerBack, rod);
+    [-1, 1].forEach(function (sx) {
+      var len = H - (by + bh / 2 + 0.03);
+      var cable = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, len, 6), woodDark);
+      cable.position.set(sx * (bw / 2 - 0.2), H - len / 2, 0.015); g.add(cable);
+    });
+    var pool = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4), new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, depthWrite: false }));
+    pool.rotation.x = -Math.PI / 2; pool.position.set(0, 0.006, 0);
+    g.add(pool);
+    scene.add(g);
+    var glowLight = new THREE.PointLight(0xfff0d0, 0.5, 6, 1.5);
+    glowLight.position.set(0, 3.4, z + 1.2); scene.add(glowLight);
+    var item = {
+      kind: 'frame', room: roomIdx, center: new THREE.Vector3(0, cy, z), n: new THREE.Vector3(0, 0, 1), w: w + t * 2, h: h + t * 2,
+      eyebrow: room.eyebrow, title: room.title,
+      text: 'Este cuadro espera la foto de lo que viene. Puedes atravesarlo caminando.'
+    };
+    item.index = items.length; items.push(item);
+    canvasMesh.userData.item = item.index;
+    clickable.push(canvasMesh);
+    passFrame = { group: g, canvas: canvasMesh, w: w, h: h };
+  }
+
   // Piso y techo continuos
   var totalLen = N * D;
   var floor = new THREE.Mesh(new THREE.PlaneGeometry(W, totalLen), new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.72 }));
@@ -694,25 +782,37 @@ body {
       var lt = new THREE.Mesh(new THREE.BoxGeometry(DOOR + 0.24, 0.12, WALL_T * 2 + 0.04), woodDark);
       lt.position.set(0, DOORH + 0.06, zb); scene.add(lt);
     }
-    // Rótulo grande de la sala sobre la pared del fondo
+    // Rótulo grande de la sala sobre la pared del fondo (en la sala final va en el estandarte sobre el cuadro)
+    if (room.kind !== 'final') {
     var band = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.6, (W - 0.6) * 260 / 2400), new THREE.MeshBasicMaterial({ map: bandText(room.eyebrow, room.title, room.accent), transparent: true, depthWrite: false }));
     band.position.set(0, DOORH + (H - DOORH) / 2 + 0.02, z - D / 2 + WALL_T + 0.01);
     scene.add(band);
+    }
     // Banca
+    if (room.kind !== 'final') {
     var seat = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 0.5), new THREE.MeshStandardMaterial({ color: 0x4a3324, roughness: 0.6 }));
     seat.position.set(0, 0.45, z - 0.2); scene.add(seat);
     [-0.75, 0.75].forEach(function (x) {
       var leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.41, 0.42), woodDark);
       leg.position.set(x, 0.205, z - 0.2); scene.add(leg);
     });
+    }
     var light = new THREE.PointLight(0xffefd9, 0.55, 14, 1.2);
     light.position.set(0, H - 0.4, z + 0.5); scene.add(light);
 
     // Obras
-    if (i === 0) {
+    if (room.kind === 'entrance') {
       addPhoto(0, 'img/01.jpg', 1, 'back', -3.1, 1.7, 1.7, 1.75, { eyebrow: 'Entrada', title: 'Fundación Niños de Paz', text: '' });
       addText(0, 'back', 3.1, 1.75, { eyebrow: FOUNDATION.eyebrow, title: FOUNDATION.title, text: FOUNDATION.text, accent: room.accent, width: 3.0, maxH: 2.5 }, FOUNDATION);
       addText(0, 'left', 0, 1.75, { eyebrow: ROUTE.eyebrow, title: ROUTE.title, text: ROUTE.text, accent: room.accent, width: 2.4, maxH: 2.4 }, ROUTE);
+    } else if (room.kind === 'about') {
+      var aboutSlots = [['left', 2.2], ['left', -2.2], ['back', -3.1], ['back', 3.1], ['right', -2.2]];
+      room.panels.forEach(function (pn, k) {
+        var sl = aboutSlots[k];
+        addText(i, sl[0], sl[1], 1.7, { eyebrow: room.title, title: pn.title, text: pn.text, accent: room.accent, width: 2.6, maxH: 2.4 }, { eyebrow: room.title, title: pn.title, text: pn.text });
+      });
+    } else if (room.kind === 'final') {
+      addPassFrame(i, room);
     } else {
       addText(i, 'left', 0, 1.7, { eyebrow: room.eyebrow, title: room.title, text: room.text, accent: room.accent, width: 2.9, maxH: 2.4 }, { eyebrow: room.eyebrow, title: room.title, text: room.text });
       var slots = [['back', -3.1, 2.7, 2.0, 1.65], ['back', 3.1, 2.7, 2.0, 1.65], ['right', 0, 3.4, 2.2, 1.7]];
@@ -950,7 +1050,7 @@ body {
   function goRoom(i) {
     if (mode === 'focus') { sheet.classList.remove('open'); canvasEl.classList.remove('focused'); }
     setUiHidden(false);
-    travel(new THREE.Vector3(0, EYE, cz(i) + D / 2 - 1.3), 0, -0.03, function () { mode = 'walk'; current = -1; });
+    travel(new THREE.Vector3(0, EYE, cz(i) + D / 2 - 1.3), 0, ROOMS[i].kind === 'final' ? 0.1 : -0.03, function () { mode = 'walk'; current = -1; });
   }
   document.getElementById('back').addEventListener('click', function () {
     var relock = relockAfterFocus;
